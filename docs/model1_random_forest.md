@@ -77,11 +77,37 @@ Same forest and split, with PCA in front (validation set):
 | Input | Variance kept | Accuracy | Macro F1 |
 |---|---|---|---|
 | raw pixels (12,288 columns) | 100% | 58.6% | 0.541 |
-| PCA-256 | 80% | 52.9% | 0.471 |
-| PCA-50 | 65% | 57.6% | 0.542 |
+| PCA-256 | 80% | 53.1% | 0.478 |
+| PCA-50 | 65% | 57.4% | 0.532 |
 
-- PCA-256 lowers accuracy by 5.7 points, so PCA explains part of the gap, but not all of it.
+- PCA-256 lowers accuracy by 5.5 points, so PCA explains part of the gap, but not all of it.
 - PCA-50 keeps less information but scores higher than PCA-256. Likely reason: the later components are
   mostly noise, and with `max_features="sqrt"` a tree picks from only 16 random columns out of 256,
   most of them noise. With 50 components, most candidates are useful.
 - Compression is not good or bad by itself: it has to be measured on the validation set.
+
+## Experiment (step 6, validation set)
+
+`src/model1_experiments.py`: each variant changes one thing compared with the baseline.
+Results also in `results/model1_rf/experiments.csv`.
+
+| Variant | Image size | PCA | `min_samples_leaf` | Columns | Accuracy | Macro F1 |
+|---|---|---|---|---|---|---|
+| baseline | 64 | none | 1 | 12,288 | 58.6% | 0.541 |
+| tiny images | 16 | none | 1 | 768 | 56.0% | 0.516 |
+| smaller images | 32 | none | 1 | 3,072 | 58.9% | 0.537 |
+| bigger images | 128 | none | 1 | 49,152 | 59.0% | 0.541 |
+| PCA-50 | 64 | 50 | 1 | 50 | 57.4% | 0.532 |
+| PCA-256 | 64 | 256 | 1 | 256 | 53.1% | 0.478 |
+| less memorising | 64 | none | 5 | 12,288 | 58.0% | 0.546 |
+
+- With 2,633 validation images, accuracy has a natural noise of about +/-1 point, so differences
+  below ~1-2 points are not real improvements.
+- Image size: accuracy levels off from 32x32 upwards (58.9% / 58.6% / 59.0% for 32 / 64 / 128).
+  Only 16x16 is slightly worse (56.0%), where small galaxies shrink to 1-3 pixels.
+  The forest cannot use finer detail, so 128x128 only makes training 5x slower (77 s vs 16 s).
+- Leaf size (`min_samples_leaf` 1 vs 5) makes no measurable difference.
+- PCA-256 is the only clear effect: -5.5 points accuracy.
+- PCA is fitted on the training images only, then applied to validation (otherwise information leaks).
+- **Chosen for the test: the baseline.** It was chosen before the experiment, and picking the variant
+  that is +0.3 higher by chance would make the result optimistic. It also matches the 64x64 input of the CNNs.

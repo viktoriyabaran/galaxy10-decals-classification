@@ -1,0 +1,8 @@
+variant,image_size,pca,min_samples_leaf,columns,val_accuracy,val_macro_f1,seconds
+baseline,64,none,1,12288,0.586,0.5408,16
+tiny images,16,none,1,768,0.5602,0.5156,33
+smaller images,32,none,1,3072,0.5887,0.5374,7
+bigger images,128,none,1,49152,0.5898,0.5406,77
+PCA-50,64,50,1,50,0.5739,0.5318,3
+PCA-256,64,256,1,256,0.5313,0.4784,7
+less memorising,64,none,5,12288,0.5803,0.5459,15
