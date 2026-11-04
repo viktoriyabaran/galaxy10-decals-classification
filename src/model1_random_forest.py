@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
 from dataset import CLASS_NAMES, PROJECT_ROOT, RAW_PATH, load_images, load_labels, load_split
+from evaluate import evaluate
 
 IMAGE_SIZE = 64
 RESULTS_DIR = PROJECT_ROOT / "results/model1_rf"
@@ -81,3 +82,7 @@ print(f"questions in a row per tree (depth): {min(depths)}-{max(depths)}, "
 
 # Score on images it has already seen: shows memorisation, not real skill (that is step 5).
 print(f"accuracy on the TRAINING images: {forest.score(X_train, y_train):.1%}")
+
+# --- Step 5: evaluate on the validation images (never seen during training) ---
+y_val_pred = forest.predict(X_val)
+evaluate(y_val, y_val_pred, "val", RESULTS_DIR)

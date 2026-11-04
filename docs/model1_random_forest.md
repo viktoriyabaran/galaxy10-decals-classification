@@ -1,0 +1,87 @@
+# Model 1: Random Forest
+
+The simple baseline: a classic machine learning model that sees each image as a flat list of pixel values.
+Code: `src/model1_random_forest.py` (shared code in `src/dataset.py` and `src/evaluate.py`).
+
+## Data
+
+- Source: `Galaxy10_DECals_NoDuplicated.h5`, cleaned by `src/prepare_data.py`
+  (1 blank image and 118 duplicates of the same object within 30" removed, 17,556 images left).
+- Split, stratified by class, seed 42: train 12,289 / validation 2,633 / test 2,634.
+
+## Preprocessing
+
+1. **Shrink 256x256 to 64x64** by averaging each 4x4 square of pixels (`load_images(64)`).
+   - No cropping: we measured that a centre crop of 128x128 would cut off part of the galaxy in 15% of
+     images, and in 61% of "Edge-on without Bulge" and 31% of "Merging" galaxies, exactly the parts
+     that define those classes.
+   - At 64x64, large galaxies keep visible features (bars, arms, thin disks); small galaxies become a few pixels.
+2. **Flatten** each 64x64x3 image into one row of 12,288 numbers and **scale** to 0-1 (divide by 255).
+   - Scaling does not matter for a Random Forest (trees only compare values with thresholds),
+     it is done so that all three models get identical input.
+
+Weakness of this representation: the forest has no idea which pixels are neighbours, and the same shape
+at a different position or angle looks like completely different numbers.
+
+## Model settings
+
+| Setting | Value | Meaning |
+|---|---|---|
+| `n_estimators` | 300 | number of trees that vote |
+| `max_features` | `"sqrt"` | each question picks from sqrt(12,288) ~ 110 random pixels |
+| `min_samples_leaf` | 1 | trees may keep splitting until every training image sits alone |
+| `class_weight` | `"balanced"` | mistakes on rare classes count more |
+| `random_state` | 42 | same forest every run |
+
+Training takes ~16 s on an Apple M4 (10 cores). Trees are 24-49 questions deep with ~2,372 leaves each.
+
+## Results (validation set)
+
+- Training accuracy: **100%**: the trees memorise the training images.
+- Validation accuracy: **58.6%**, macro F1: **0.541** (random guessing: ~10-15%).
+
+| Class | Precision | Recall | F1 |
+|---|---|---|---|
+| Disturbed | 0.493 | 0.204 | 0.288 |
+| Merging | 0.637 | 0.511 | 0.567 |
+| Round Smooth | 0.718 | 0.858 | 0.782 |
+| In-between Round Smooth | 0.633 | 0.660 | 0.646 |
+| Cigar Shaped Smooth | 0.714 | 0.200 | 0.312 |
+| Barred Spiral | 0.472 | 0.363 | 0.410 |
+| Unbarred Tight Spiral | 0.438 | 0.546 | 0.486 |
+| Unbarred Loose Spiral | 0.433 | 0.442 | 0.438 |
+| Edge-on without Bulge | 0.695 | 0.858 | 0.768 |
+| Edge-on with Bulge | 0.667 | 0.760 | 0.710 |
+
+Confusion matrix: `results/model1_rf/confusion_val.png`.
+
+### What the confusion matrix shows
+
+- **Easy:** Round Smooth (86%) and Edge-on without Bulge (86%), classes with a consistent look.
+- **The three spirals are confused with each other:** only 36% of Barred Spirals are recognised
+  (23% called Tight, 24% Loose). Bars and arm tightness are fine details.
+- **Disturbed: 20%**, 31% are called Unbarred Loose Spiral. Irregular shapes have no fixed pixel pattern.
+- **Cigar Shaped Smooth: 20%**, 38% called In-between Round Smooth, 24% Edge-on with Bulge.
+  Few training examples (233), and the tilt angle varies.
+- **Edge-on with / without Bulge** swap ~10% each way: the bulge is a small detail.
+
+## Comparison with the literature
+
+You (2025, *Evaluation of Galaxy Morphology Classification with ML and DL*) report Random Forest 38.2%
+and SVM 43.7% on 64x64 images compressed with PCA-256, on the original dataset with a random split.
+
+### Does PCA explain the difference?
+
+Same forest and split, with PCA in front (validation set):
+
+| Input | Variance kept | Accuracy | Macro F1 |
+|---|---|---|---|
+| raw pixels (12,288 columns) | 100% | 58.6% | 0.541 |
+| PCA-256 | 80% | 52.9% | 0.471 |
+| PCA-50 | 65% | 57.6% | 0.542 |
+
+- PCA-256 lowers accuracy by 5.7 points, so PCA explains part of the gap, but not all of it.
+- PCA-50 keeps less information but scores higher than PCA-256. Likely reason: the later components are
+  mostly noise, and with `max_features="sqrt"` a tree picks from only 16 random columns out of 256,
+  most of them noise. With 50 components, most candidates are useful.
+- Compression is not good or bad by itself: it has to be measured on the validation set.
