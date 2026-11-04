@@ -45,3 +45,15 @@ axes[1, 0].set_ylabel(f"{IMAGE_SIZE} x {IMAGE_SIZE}")
 plt.tight_layout()
 plt.savefig(RESULTS_DIR / f"shrink_{IMAGE_SIZE}.png", dpi=90)
 print(f"saved before/after picture to {RESULTS_DIR / f'shrink_{IMAGE_SIZE}.png'}")
+
+# --- Step 3: turn the images into a table ---
+X_train = img_train.reshape(len(img_train), -1).astype(np.float32) / 255
+X_val = img_val.reshape(len(img_val), -1).astype(np.float32) / 255
+X_test = img_test.reshape(len(img_test), -1).astype(np.float32) / 255
+
+print(f"\ntable X_train: {X_train.shape[0]} rows (images) x {X_train.shape[1]} columns (numbers), "
+      f"{X_train.nbytes / 1e6:.0f} MB")
+print(f"values from {X_train.min():.2f} to {X_train.max():.2f}")
+print(f"first image, first 6 columns (pixel (0,0) R G B, pixel (0,1) R G B): {X_train[0, :6].round(3)}")
+centre = (32 * IMAGE_SIZE + 32) * 3
+print(f"first image, centre pixel R G B (columns {centre}-{centre + 2}): {X_train[0, centre:centre + 3].round(3)}")
