@@ -1,0 +1,4 @@
+part,images,seconds,ms_per_image
+training (fit),12289,15.856,1.2902
+validation (predict),2633,0.071,0.027
+test (predict),2634,0.072,0.0275

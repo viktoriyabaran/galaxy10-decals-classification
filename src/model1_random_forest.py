@@ -1,5 +1,6 @@
 """Model 1: Random Forest on downscaled, flattened galaxy images.
 """
+import csv
 import time
 
 import h5py
@@ -71,9 +72,12 @@ forest = RandomForestClassifier(
     n_jobs=-1,                # build trees on all CPU cores at once
     random_state=42,          # same random choices -> same forest every run
 )
+timings = []
+
 start = time.perf_counter()
 forest.fit(X_train, y_train)  # learns only from the training part
-print(f"\ntrained {len(forest.estimators_)} trees in {time.perf_counter() - start:.0f} s")
+timings.append(("training (fit)", len(X_train), time.perf_counter() - start))
+print(f"\ntrained {len(forest.estimators_)} trees in {timings[-1][2]:.1f} s")
 
 depths = [tree.get_depth() for tree in forest.estimators_]
 leaves = [tree.get_n_leaves() for tree in forest.estimators_]
@@ -84,5 +88,24 @@ print(f"questions in a row per tree (depth): {min(depths)}-{max(depths)}, "
 print(f"accuracy on the TRAINING images: {forest.score(X_train, y_train):.1%}")
 
 # --- Step 5: evaluate on the validation images (never seen during training) ---
+start = time.perf_counter()
 y_val_pred = forest.predict(X_val)
+timings.append(("validation (predict)", len(X_val), time.perf_counter() - start))
 evaluate(y_val, y_val_pred, "val", RESULTS_DIR)
+
+# --- Step 7: final score on the test images (run once, with the setting chosen in step 6) ---
+start = time.perf_counter()
+y_test_pred = forest.predict(X_test)
+timings.append(("test (predict)", len(X_test), time.perf_counter() - start))
+evaluate(y_test, y_test_pred, "test", RESULTS_DIR)
+
+print(f"\n{'part':22s} {'images':>6s} {'seconds':>8s} {'ms per image':>12s}")
+for part, n, seconds in timings:
+    print(f"{part:22s} {n:>6d} {seconds:>8.2f} {seconds / n * 1000:>12.3f}")
+
+with open(RESULTS_DIR / "timings.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["part", "images", "seconds", "ms_per_image"])
+    for part, n, seconds in timings:
+        writer.writerow([part, n, round(seconds, 3), round(seconds / n * 1000, 4)])
+print(f"saved to {RESULTS_DIR / 'timings.csv'}")

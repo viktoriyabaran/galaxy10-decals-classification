@@ -111,3 +111,46 @@ Results also in `results/model1_rf/experiments.csv`.
 - PCA is fitted on the training images only, then applied to validation (otherwise information leaks).
 - **Chosen for the test: the baseline.** It was chosen before the experiment, and picking the variant
   that is +0.3 higher by chance would make the result optimistic. It also matches the 64x64 input of the CNNs.
+## Final result (step 7, test set, run once)
+
+| | Validation | **Test** |
+|---|---|---|
+| Accuracy | 58.6% | **58.1%** |
+| Macro F1 | 0.541 | **0.527** |
+
+| Class | Precision | Recall | F1 | Validation F1 |
+|---|---|---|---|---|
+| Disturbed | 0.464 | 0.198 | 0.277 | 0.288 |
+| Merging | 0.701 | 0.561 | 0.623 | 0.567 |
+| Round Smooth | 0.678 | 0.818 | 0.741 | 0.782 |
+| In-between Round Smooth | 0.577 | 0.696 | 0.631 | 0.646 |
+| Cigar Shaped Smooth | 0.500 | 0.120 | 0.194 | 0.312 |
+| Barred Spiral | 0.491 | 0.350 | 0.408 | 0.410 |
+| Unbarred Tight Spiral | 0.476 | 0.612 | 0.535 | 0.486 |
+| Unbarred Loose Spiral | 0.432 | 0.411 | 0.422 | 0.438 |
+| Edge-on without Bulge | 0.682 | 0.853 | 0.758 | 0.768 |
+| Edge-on with Bulge | 0.664 | 0.700 | 0.682 | 0.710 |
+
+Confusion matrix: `results/model1_rf/confusion_test.png`.
+
+- Test and validation agree within the noise (-0.5 points), as expected from a split without leakage.
+- The same pattern as on validation: Round Smooth and Edge-on without Bulge are easy, the three spirals
+  are confused with each other, Disturbed is mostly called Unbarred Loose Spiral (30%).
+- Cigar Shaped Smooth is the weakest class: only 6 of 50 found (12%). 38% are called Edge-on with Bulge
+  and 26% In-between Round Smooth. With only 50 test images, its per-class numbers jump a lot between
+  validation and test (10 vs 6 found), so they are less reliable than the others.
+
+**Model 1 result for the comparison: test accuracy 58.1%, macro F1 0.527.**
+
+### Time (Apple M4, 10 cores, 32 GB)
+
+| Part | Images | Time | Per image |
+|---|---|---|---|
+| Training (`fit`) | 12,289 | 15.86 s | 1.290 ms |
+| Validation (`predict`) | 2,633 | 0.07 s | 0.027 ms |
+| Test (`predict`) | 2,634 | 0.07 s | 0.028 ms |
+
+Source: `results/model1_rf/timings.csv`, written by `src/model1_random_forest.py`.
+
+- Per image, training is ~47x slower than predicting (1.290 vs 0.028 ms).
+- Predicting one galaxy takes ~0.03 ms, about 36,000 galaxies per second.
