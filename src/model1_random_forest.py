@@ -1,8 +1,11 @@
 """Model 1: Random Forest on downscaled, flattened galaxy images.
 """
+import time
+
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 
 from dataset import CLASS_NAMES, PROJECT_ROOT, RAW_PATH, load_images, load_labels, load_split
 
@@ -57,3 +60,24 @@ print(f"values from {X_train.min():.2f} to {X_train.max():.2f}")
 print(f"first image, first 6 columns (pixel (0,0) R G B, pixel (0,1) R G B): {X_train[0, :6].round(3)}")
 centre = (32 * IMAGE_SIZE + 32) * 3
 print(f"first image, centre pixel R G B (columns {centre}-{centre + 2}): {X_train[0, centre:centre + 3].round(3)}")
+
+# --- Step 4: train the Random Forest ---
+forest = RandomForestClassifier(
+    n_estimators=300,         # number of trees that vote
+    max_features="sqrt",      # each question picks from sqrt(12,288) ~ 110 random pixels
+    min_samples_leaf=1,       # trees may keep splitting until every image sits alone
+    class_weight="balanced",  # mistakes on rare classes (e.g. Cigar Shaped) count more
+    n_jobs=-1,                # build trees on all CPU cores at once
+    random_state=42,          # same random choices -> same forest every run
+)
+start = time.perf_counter()
+forest.fit(X_train, y_train)  # learns only from the training part
+print(f"\ntrained {len(forest.estimators_)} trees in {time.perf_counter() - start:.0f} s")
+
+depths = [tree.get_depth() for tree in forest.estimators_]
+leaves = [tree.get_n_leaves() for tree in forest.estimators_]
+print(f"questions in a row per tree (depth): {min(depths)}-{max(depths)}, "
+      f"final answers per tree (leaves): ~{int(np.mean(leaves))}")
+
+# Score on images it has already seen: shows memorisation, not real skill (that is step 5).
+print(f"accuracy on the TRAINING images: {forest.score(X_train, y_train):.1%}")
