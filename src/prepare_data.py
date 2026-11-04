@@ -11,9 +11,9 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import BallTree
 
-RAW_PATH = "data/raw/Galaxy10_DECals_NoDuplicated.h5"
-OUT_PATH = "data/processed/split.npz"
-SEED = 42                  # fixed seed -> the same split every time
+from dataset import RAW_PATH, SPLIT_PATH as OUT_PATH
+
+SEED = 42                 # fixed seed -> the same split every time
 SAME_OBJECT_ARCSEC = 30    # closer than this on the sky = the same object photographed twice
 
 # --- Step 1: load labels and sky positions (small arrays, one number per image) ---
