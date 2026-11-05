@@ -11,6 +11,21 @@ def get_device():
     return torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
 
+def augment(x):
+    """Give every image in a batch a random orientation: rotated by 0/90/180/270 degrees, flipped or not.
+
+    That makes 8 possible versions of each galaxy. Galaxies have no "up" in space,
+    so every version shows the same galaxy type.
+    """
+    turns = torch.randint(0, 4, (len(x),)).to(x.device)       # how many 90-degree turns per image
+    flip = (torch.rand(len(x)) < 0.5).to(x.device)            # mirror half of the images
+    x = x.clone()                                              # leave the original batch unchanged
+    for k in (1, 2, 3):
+        x[turns == k] = torch.rot90(x[turns == k], k, dims=(2, 3))
+    x[flip] = x[flip].flip(dims=(3,))
+    return x
+
+
 def to_tensors(images, idx, labels):
     """Pick images by number and turn them into PyTorch tensors.
 
