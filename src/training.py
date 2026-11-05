@@ -1,6 +1,11 @@
 """Shared PyTorch code for the neural network models (2 and 3).
 """
+import csv
+import time
+
+import matplotlib.pyplot as plt
 import torch
+from sklearn.metrics import accuracy_score, f1_score
 from torch.utils.data import DataLoader, TensorDataset
 
 from dataset import load_images, load_labels, load_split
@@ -65,3 +70,97 @@ def make_loaders(size=64, batch_size=64, seed=42):
     test_loader = DataLoader(TensorDataset(x_test, y_test), batch_size=batch_size, shuffle=False)
 
     return train_loader, val_loader, test_loader, mean.flatten(), std.flatten()
+
+
+def class_weights(y_train, n_classes=10):
+    """Weight per class so that every class counts equally in the loss.
+
+    Same formula as class_weight="balanced" in scikit-learn (model 1):
+    number of images / (number of classes x images in that class). Rare classes get large weights.
+    """
+    counts = torch.bincount(y_train, minlength=n_classes).float()
+    return len(y_train) / (n_classes * counts)
+
+
+def train_one_epoch(model, loader, loss_fn, optimizer, device, use_augment=True):
+    """One pass over all training batches; the network learns after every batch. Returns the mean loss."""
+    model.train()                       # training mode: Dropout on, BatchNorm learns statistics
+    total_loss, n_images = 0.0, 0
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)
+        if use_augment:
+            x = augment(x)              # new random orientation for every image, every epoch
+        loss = loss_fn(model(x), y)     # 1. guess and measure how wrong
+        optimizer.zero_grad()           # 2. clear the previous step's directions
+        loss.backward()                 # 3. how should every number change?
+        optimizer.step()                # 4. change every number a little
+        total_loss += loss.item() * len(y)
+        n_images += len(y)
+    return total_loss / n_images
+
+
+@torch.no_grad()                        # only measuring: no gradients needed (faster, less memory)
+def predict(model, loader, loss_fn, device):
+    """Guess the class of every image in a loader, without learning. Returns mean loss, guesses, truths."""
+    model.eval()                        # evaluation mode: Dropout off, BatchNorm uses learned statistics
+    total_loss, guesses, truths = 0.0, [], []
+    for x, y in loader:
+        x, y = x.to(device), y.to(device)
+        scores = model(x)
+        total_loss += loss_fn(scores, y).item() * len(y)
+        guesses.append(scores.argmax(dim=1).cpu())   # the class with the highest score
+        truths.append(y.cpu())
+    guesses, truths = torch.cat(guesses).numpy(), torch.cat(truths).numpy()
+    return total_loss / len(truths), guesses, truths
+
+
+def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out_dir):
+    """Train for a number of epochs; after each one, measure on validation. Logs to history.csv."""
+    history = []
+    print(f"\n{'epoch':>5s} {'train loss':>10s} {'val loss':>8s} {'val acc':>7s} {'val F1':>6s} {'seconds':>7s}")
+    for epoch in range(1, epochs + 1):
+        start = time.perf_counter()
+        train_loss = train_one_epoch(model, train_loader, loss_fn, optimizer, device)
+        train_seconds = time.perf_counter() - start
+
+        val_loss, val_guesses, val_truths = predict(model, val_loader, loss_fn, device)
+        row = {
+            "epoch": epoch,
+            "train_loss": round(train_loss, 4),
+            "val_loss": round(val_loss, 4),
+            "val_accuracy": round(accuracy_score(val_truths, val_guesses), 4),
+            "val_macro_f1": round(f1_score(val_truths, val_guesses, average="macro"), 4),
+            "train_seconds": round(train_seconds, 2),
+        }
+        history.append(row)
+        print(f"{epoch:>5d} {row['train_loss']:>10.3f} {row['val_loss']:>8.3f} {row['val_accuracy']:>7.1%} "
+              f"{row['val_macro_f1']:>6.3f} {row['train_seconds']:>7.1f}")
+
+    with open(out_dir / "history.csv", "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=history[0].keys())
+        writer.writeheader()
+        writer.writerows(history)
+    plot_history(history, out_dir / "learning_curves.png")
+    return history
+
+
+def plot_history(history, path):
+    """Learning curves: loss (left) and validation scores (right) after every epoch."""
+    epochs = [row["epoch"] for row in history]
+    fig, (left, right) = plt.subplots(1, 2, figsize=(12, 4.5))
+    left.plot(epochs, [row["train_loss"] for row in history], marker="o", label="training")
+    left.plot(epochs, [row["val_loss"] for row in history], marker="o", label="validation")
+    left.set_xlabel("epoch")
+    left.set_ylabel("loss (lower is better)")
+    left.legend()
+    right.plot(epochs, [row["val_accuracy"] for row in history], marker="o", label="accuracy")
+    right.plot(epochs, [row["val_macro_f1"] for row in history], marker="o", label="macro F1")
+    right.set_xlabel("epoch")
+    right.set_ylabel("validation score (higher is better)")
+    right.legend()
+    for ax in (left, right):
+        ax.grid(alpha=0.3)
+        ax.spines[["top", "right"]].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(path, dpi=100)
+    plt.close(fig)
