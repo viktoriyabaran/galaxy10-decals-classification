@@ -114,18 +114,24 @@ def predict(model, loader, loss_fn, device):
     return total_loss / len(truths), guesses, truths
 
 
-def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out_dir):
-    """Train for a number of epochs; after each one, measure on validation. Logs to history.csv."""
+def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out_dir,
+        scheduler=None, checkpoint_path=None, patience=None):
     history = []
-    print(f"\n{'epoch':>5s} {'train loss':>10s} {'val loss':>8s} {'val acc':>7s} {'val F1':>6s} {'seconds':>7s}")
+    best_f1, best_epoch = -1.0, 0
+    print(f"\n{'epoch':>5s} {'lr':>8s} {'train loss':>10s} {'val loss':>8s} {'val acc':>7s} {'val F1':>6s} "
+          f"{'seconds':>7s}")
     for epoch in range(1, epochs + 1):
+        learning_rate = optimizer.param_groups[0]["lr"]
         start = time.perf_counter()
         train_loss = train_one_epoch(model, train_loader, loss_fn, optimizer, device)
         train_seconds = time.perf_counter() - start
+        if scheduler is not None:
+            scheduler.step()
 
         val_loss, val_guesses, val_truths = predict(model, val_loader, loss_fn, device)
         row = {
             "epoch": epoch,
+            "learning_rate": learning_rate,
             "train_loss": round(train_loss, 4),
             "val_loss": round(val_loss, 4),
             "val_accuracy": round(accuracy_score(val_truths, val_guesses), 4),
@@ -133,18 +139,32 @@ def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out
             "train_seconds": round(train_seconds, 2),
         }
         history.append(row)
-        print(f"{epoch:>5d} {row['train_loss']:>10.3f} {row['val_loss']:>8.3f} {row['val_accuracy']:>7.1%} "
-              f"{row['val_macro_f1']:>6.3f} {row['train_seconds']:>7.1f}")
+
+        is_best = row["val_macro_f1"] > best_f1
+        if is_best:
+            best_f1, best_epoch = row["val_macro_f1"], epoch
+            if checkpoint_path is not None:
+                torch.save(model.state_dict(), checkpoint_path)   # all learned numbers, as a file
+        print(f"{epoch:>5d} {learning_rate:>8.6f} {row['train_loss']:>10.3f} {row['val_loss']:>8.3f} "
+              f"{row['val_accuracy']:>7.1%} {row['val_macro_f1']:>6.3f} {row['train_seconds']:>7.1f}"
+              f"{'  <- best so far' if is_best else ''}")
+
+        if patience is not None and epoch - best_epoch >= patience:
+            print(f"early stop: no improvement for {patience} epochs")
+            break
+
+    if checkpoint_path is not None:
+        model.load_state_dict(torch.load(checkpoint_path))         # back to the best epoch
 
     with open(out_dir / "history.csv", "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=history[0].keys())
         writer.writeheader()
         writer.writerows(history)
-    plot_history(history, out_dir / "learning_curves.png")
-    return history
+    plot_history(history, out_dir / "learning_curves.png", best_epoch)
+    return history, best_epoch
 
 
-def plot_history(history, path):
+def plot_history(history, path, best_epoch=None):
     """Learning curves: loss (left) and validation scores (right) after every epoch."""
     epochs = [row["epoch"] for row in history]
     fig, (left, right) = plt.subplots(1, 2, figsize=(12, 4.5))
@@ -157,8 +177,12 @@ def plot_history(history, path):
     right.plot(epochs, [row["val_macro_f1"] for row in history], marker="o", label="macro F1")
     right.set_xlabel("epoch")
     right.set_ylabel("validation score (higher is better)")
+    if best_epoch:
+        right.set_title(f"best epoch: {best_epoch} (dashed line)", fontsize=10)
     right.legend()
     for ax in (left, right):
+        if best_epoch:
+            ax.axvline(best_epoch, color="grey", linestyle="--", linewidth=1)
         ax.grid(alpha=0.3)
         ax.spines[["top", "right"]].set_visible(False)
     plt.tight_layout()

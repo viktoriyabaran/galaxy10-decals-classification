@@ -7,16 +7,21 @@ import torch
 from torch import nn
 
 from dataset import CLASS_NAMES, PROJECT_ROOT
-from training import augment, class_weights, fit, get_device, make_loaders
+from evaluate import evaluate
+from training import augment, class_weights, fit, get_device, make_loaders, predict
 
 IMAGE_SIZE = 64
 BATCH_SIZE = 64     # images per training step
 SEED = 42           # fixes all random choices (start values of the network, shuffling)
 LEARNING_RATE = 1e-3   # how big a step the optimizer takes after each batch
-EPOCHS = 30            # how many times the network sees all training images
+EPOCHS = 50            # at most this many passes over all training images
+PATIENCE = 10          # stop early if validation macro F1 has not improved for this many epochs
+TRAIN = False          # True: train the network again (~6 min); False: load the saved best network
 
 RESULTS_DIR = PROJECT_ROOT / "results/model2_cnn"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+MODEL_PATH = PROJECT_ROOT / "models/model2_cnn.pt"
+MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 torch.manual_seed(SEED)
 device = get_device()
@@ -156,7 +161,19 @@ for step in range(1, 6):
     demo_optimizer.step()                          # 4. change every number a little in that direction
     print(f"learning step {step} on the same batch: loss {loss.item():.3f}")
 
-# --- Step 5: the training loop ---
-history = fit(model, train_loader, val_loader, loss_fn, optimizer, device, EPOCHS, RESULTS_DIR)
-print(f"\ntotal training time: {sum(row['train_seconds'] for row in history):.0f} s")
-print(f"saved history.csv and learning_curves.png to {RESULTS_DIR}")
+# --- Steps 5 and 6: the training loop, keeping the best epoch ---
+if TRAIN:
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
+    history, best_epoch = fit(model, train_loader, val_loader, loss_fn, optimizer, device, EPOCHS, RESULTS_DIR,
+                              scheduler=scheduler, checkpoint_path=MODEL_PATH, patience=PATIENCE)
+    best = history[best_epoch - 1]
+    print(f"\nbest epoch {best_epoch}: val accuracy {best['val_accuracy']:.1%}, macro F1 {best['val_macro_f1']:.3f}")
+    print(f"total training time: {sum(row['train_seconds'] for row in history):.0f} s for {len(history)} epochs")
+    print(f"saved the best network to {MODEL_PATH}, history.csv and learning_curves.png to {RESULTS_DIR}")
+else:
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    print(f"\nloaded the saved best network from {MODEL_PATH}")
+
+# --- Step 7: evaluate on the validation images ---
+_, y_val_pred, y_val = predict(model, val_loader, loss_fn, device)
+evaluate(y_val, y_val_pred, "val", RESULTS_DIR)
