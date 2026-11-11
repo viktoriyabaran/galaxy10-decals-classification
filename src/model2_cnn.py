@@ -8,6 +8,7 @@ from torch import nn
 
 from dataset import CLASS_NAMES, PROJECT_ROOT
 from evaluate import evaluate
+from small_cnn import SmallCNN
 from training import augment, class_weights, fit, get_device, make_loaders, predict
 
 IMAGE_SIZE = 64
@@ -76,38 +77,7 @@ print(f"pixel values sorted are identical after augmenting: "
       f"{torch.equal(galaxy.flatten().sort().values, augment(galaxy).flatten().sort().values)}")
 
 
-# --- Step 3: build the network ---
-def conv_block(channels_in, channels_out):
-    """Find patterns, normalise, keep the positive answers, halve the image size."""
-    return nn.Sequential(
-        nn.Conv2d(channels_in, channels_out, kernel_size=3, padding=1),  # channels_out filters of 3x3
-        nn.BatchNorm2d(channels_out),   # keeps the numbers in a stable range -> faster, steadier training
-        nn.ReLU(),                      # negative -> 0: "pattern not here"
-        nn.MaxPool2d(2),                # keep the strongest answer in each 2x2 square: 64 -> 32 -> ...
-    )
-
-
-class SmallCNN(nn.Module):
-    def __init__(self, n_classes=10):
-        super().__init__()
-        # Each block learns more filters, and sees a larger area of the galaxy than the one before.
-        self.features = nn.Sequential(
-            conv_block(3, 32),     # 64x64 -> 32x32: edges, bright spots
-            conv_block(32, 64),    # 32x32 -> 16x16: blobs, curves
-            conv_block(64, 128),   # 16x16 -> 8x8:   larger shapes
-            conv_block(128, 256),  # 8x8   -> 4x4:   whole structures (arms, bars, disks)
-        )
-        self.classifier = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),   # average each of the 256 feature maps to one number
-            nn.Flatten(),              # (batch, 256, 1, 1) -> (batch, 256)
-            nn.Dropout(0.3),           # during training, randomly switch off 30% of them (less memorising)
-            nn.Linear(256, n_classes), # 256 numbers -> 10 scores, one per class
-        )
-
-    def forward(self, x):
-        return self.classifier(self.features(x))
-
-
+# --- Step 3: build the network
 model = SmallCNN(len(CLASS_NAMES)).to(device)
 
 # eval mode: look at the network without changing it (training mode would update BatchNorm's statistics)
