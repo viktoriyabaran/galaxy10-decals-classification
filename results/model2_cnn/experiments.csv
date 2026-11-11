@@ -1,0 +1,4 @@
+variant,image_size,augment,epochs_trained,best_epoch,val_accuracy,val_macro_f1,train_seconds
+baseline,64,True,50,50,0.7979,0.7785,354
+no augmentation,64,False,26,16,0.6965,0.6521,166
+128x128 images,128,True,50,44,0.7812,0.7592,1382
