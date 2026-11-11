@@ -139,6 +139,7 @@ def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out
             "train_seconds": round(train_seconds, 2),
         }
         history.append(row)
+        save_history(history, out_dir / "history.csv")   # after every epoch: nothing is lost if a run stops early
 
         is_best = row["val_macro_f1"] > best_f1
         if is_best:
@@ -156,12 +157,15 @@ def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out
     if checkpoint_path is not None:
         model.load_state_dict(torch.load(checkpoint_path))         # back to the best epoch
 
-    with open(out_dir / "history.csv", "w", newline="") as f:
+    plot_history(history, out_dir / "learning_curves.png", best_epoch)
+    return history, best_epoch
+
+
+def save_history(history, path):
+    with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=history[0].keys())
         writer.writeheader()
         writer.writerows(history)
-    plot_history(history, out_dir / "learning_curves.png", best_epoch)
-    return history, best_epoch
 
 
 def plot_history(history, path, best_epoch=None):
