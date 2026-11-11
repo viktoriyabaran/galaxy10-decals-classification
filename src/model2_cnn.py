@@ -1,6 +1,8 @@
 """Model 2: a small convolutional neural network (CNN), trained from scratch.
 """
 import copy
+import csv
+import time
 
 import matplotlib.pyplot as plt
 import torch
@@ -144,6 +146,41 @@ else:
     model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
     print(f"\nloaded the saved best network from {MODEL_PATH}")
 
+model.eval()
+with torch.no_grad():
+    model(x.to(device))
+
 # --- Step 7: evaluate on the validation images ---
+start = time.perf_counter()
 _, y_val_pred, y_val = predict(model, val_loader, loss_fn, device)
+val_seconds = time.perf_counter() - start
 evaluate(y_val, y_val_pred, "val", RESULTS_DIR)
+
+# --- Step 9: final score on the test images ---
+start = time.perf_counter()
+_, y_test_pred, y_test = predict(model, test_loader, loss_fn, device)
+test_seconds = time.perf_counter() - start
+evaluate(y_test, y_test_pred, "test", RESULTS_DIR)
+
+# --- Time each part took ---
+with open(RESULTS_DIR / "history.csv") as f:
+    history_rows = list(csv.DictReader(f))
+train_seconds = sum(float(row["train_seconds"]) for row in history_rows)
+n_train = len(train_loader.dataset)
+
+timings = [
+    (f"training (fit, {len(history_rows)} epochs)", n_train, train_seconds),
+    ("training (one epoch, average)", n_train, train_seconds / len(history_rows)),
+    ("validation (predict)", len(y_val), val_seconds),
+    ("test (predict)", len(y_test), test_seconds),
+]
+print(f"\n{'part':32s} {'images':>6s} {'seconds':>8s} {'ms per image':>12s}")
+for part, n, seconds in timings:
+    print(f"{part:32s} {n:>6d} {seconds:>8.2f} {seconds / n * 1000:>12.3f}")
+
+with open(RESULTS_DIR / "timings.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["part", "images", "seconds", "ms_per_image"])
+    for part, n, seconds in timings:
+        writer.writerow([part, n, round(seconds, 3), round(seconds / n * 1000, 4)])
+print(f"saved to {RESULTS_DIR / 'timings.csv'}")
