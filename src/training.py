@@ -115,7 +115,7 @@ def predict(model, loader, loss_fn, device):
 
 
 def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out_dir,
-        scheduler=None, checkpoint_path=None, patience=None):
+        scheduler=None, checkpoint_path=None, patience=None, use_augment=True):
     history = []
     best_f1, best_epoch = -1.0, 0
     print(f"\n{'epoch':>5s} {'lr':>8s} {'train loss':>10s} {'val loss':>8s} {'val acc':>7s} {'val F1':>6s} "
@@ -123,7 +123,7 @@ def fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, out
     for epoch in range(1, epochs + 1):
         learning_rate = optimizer.param_groups[0]["lr"]
         start = time.perf_counter()
-        train_loss = train_one_epoch(model, train_loader, loss_fn, optimizer, device)
+        train_loss = train_one_epoch(model, train_loader, loss_fn, optimizer, device, use_augment)
         train_seconds = time.perf_counter() - start
         if scheduler is not None:
             scheduler.step()
