@@ -1,0 +1,4 @@
+variant,image_size,patience,epochs_trained,best_epoch,val_accuracy,val_macro_f1,train_seconds
+early stopping,128,4,9,5,0.8591,0.8425,1370
+baseline (full schedule),128,none,15,15,0.872,0.8599,2544
+256x256 images,256,none,15,12,0.875,0.8621,9493

@@ -1,0 +1,5 @@
+part,images,seconds,ms_per_image
+"training (fit, 15 epochs)",12289,2543.61,206.9827
+"training (one epoch, average)",12289,169.574,13.7988
+validation (predict),2633,6.244,2.3716
+test (predict),2634,6.381,2.4226

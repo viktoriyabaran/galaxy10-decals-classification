@@ -1,4 +1,6 @@
 import argparse
+import csv
+import time
 
 import numpy as np
 import torch
@@ -13,6 +15,8 @@ from training import class_weights, fit, get_device, predict
 parser = argparse.ArgumentParser()
 parser.add_argument("--size", type=int, default=128, choices=[128, 256], help="image size in pixels")
 parser.add_argument("--quick", action="store_true", help="tiny run (few images, 1 epoch) to test the script")
+parser.add_argument("--eval-only", action="store_true",
+                    help="no training: load the saved network, evaluate on validation and test (final run only)")
 args = parser.parse_args()
 
 IMAGE_SIZE = args.size
@@ -54,7 +58,7 @@ class GalaxyImages(Dataset):
 
 images = load_images(IMAGE_SIZE)
 labels = load_labels()
-train_idx, val_idx, _ = load_split()
+train_idx, val_idx, test_idx = load_split()
 if args.quick:
     rng = np.random.default_rng(SEED)
     train_idx, val_idx = rng.choice(train_idx, 320, replace=False), rng.choice(val_idx, 160, replace=False)
@@ -85,14 +89,54 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 
 
 # --- Step 4: training (same loop as model 2; the best epoch is saved after every improvement) ---
-history, best_epoch = fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, RESULTS_DIR,
-                          scheduler=scheduler, checkpoint_path=MODEL_PATH, patience=PATIENCE)
-best = history[best_epoch - 1]
-print(f"\nbest epoch {best_epoch}: val accuracy {best['val_accuracy']:.1%}, macro F1 {best['val_macro_f1']:.3f}")
-print(f"total training time: {sum(row['train_seconds'] for row in history) / 60:.0f} min for {len(history)} epochs")
-print(f"saved the best network to {MODEL_PATH}, history.csv and learning_curves.png to {RESULTS_DIR}")
+if not args.eval_only:
+    history, best_epoch = fit(model, train_loader, val_loader, loss_fn, optimizer, device, epochs, RESULTS_DIR,
+                              scheduler=scheduler, checkpoint_path=MODEL_PATH, patience=PATIENCE)
+    best = history[best_epoch - 1]
+    print(f"\nbest epoch {best_epoch}: val accuracy {best['val_accuracy']:.1%}, macro F1 {best['val_macro_f1']:.3f}")
+    print(f"total training time: {sum(row['train_seconds'] for row in history) / 60:.0f} min for {len(history)} epochs")
+    print(f"saved the best network to {MODEL_PATH}, history.csv and learning_curves.png to {RESULTS_DIR}")
+else:
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    print(f"\nloaded the saved best network from {MODEL_PATH}")
+
+model.eval()
+with torch.no_grad():
+    model(next(iter(val_loader))[0].to(device))   # GPU warm-up, so the first timed batch is not slower
 
 
 # --- Step 5: evaluate the best epoch on the validation images ---
+start = time.perf_counter()
 _, y_val_pred, y_val = predict(model, val_loader, loss_fn, device)
+val_seconds = time.perf_counter() - start
 evaluate(y_val, y_val_pred, "val", RESULTS_DIR)
+
+
+# --- Step 6: final score on the test images (only for the run chosen on validation) ---
+if args.eval_only:
+    test_loader = DataLoader(GalaxyImages(images, test_idx, labels), batch_size=BATCH_SIZE, shuffle=False)
+    start = time.perf_counter()
+    _, y_test_pred, y_test = predict(model, test_loader, loss_fn, device)
+    test_seconds = time.perf_counter() - start
+    evaluate(y_test, y_test_pred, "test", RESULTS_DIR)
+
+    with open(RESULTS_DIR / "history.csv") as f:
+        history_rows = list(csv.DictReader(f))
+    train_seconds = sum(float(row["train_seconds"]) for row in history_rows)
+    n_train = len(train_idx)
+    timings = [
+        (f"training (fit, {len(history_rows)} epochs)", n_train, train_seconds),
+        ("training (one epoch, average)", n_train, train_seconds / len(history_rows)),
+        ("validation (predict)", len(y_val), val_seconds),
+        ("test (predict)", len(y_test), test_seconds),
+    ]
+    print(f"\n{'part':32s} {'images':>6s} {'seconds':>8s} {'ms per image':>12s}")
+    for part, n, seconds in timings:
+        print(f"{part:32s} {n:>6d} {seconds:>8.2f} {seconds / n * 1000:>12.3f}")
+
+    with open(RESULTS_DIR / "timings.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["part", "images", "seconds", "ms_per_image"])
+        for part, n, seconds in timings:
+            writer.writerow([part, n, round(seconds, 3), round(seconds / n * 1000, 4)])
+    print(f"saved to {RESULTS_DIR / 'timings.csv'}")

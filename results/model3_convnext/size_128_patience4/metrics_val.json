@@ -1,0 +1,75 @@
+{
+  "Disturbed": {
+    "precision": 0.6370370370370371,
+    "recall": 0.5308641975308642,
+    "f1-score": 0.5791245791245792,
+    "support": 162.0
+  },
+  "Merging": {
+    "precision": 0.9026217228464419,
+    "recall": 0.9128787878787878,
+    "f1-score": 0.9077212806026366,
+    "support": 264.0
+  },
+  "Round Smooth": {
+    "precision": 0.9142857142857143,
+    "recall": 0.9721518987341772,
+    "f1-score": 0.9423312883435583,
+    "support": 395.0
+  },
+  "In-between Round Smooth": {
+    "precision": 0.9019607843137255,
+    "recall": 0.9108910891089109,
+    "f1-score": 0.9064039408866995,
+    "support": 303.0
+  },
+  "Cigar Shaped Smooth": {
+    "precision": 0.7377049180327869,
+    "recall": 0.9,
+    "f1-score": 0.8108108108108109,
+    "support": 50.0
+  },
+  "Barred Spiral": {
+    "precision": 0.9283018867924528,
+    "recall": 0.803921568627451,
+    "f1-score": 0.861646234676007,
+    "support": 306.0
+  },
+  "Unbarred Tight Spiral": {
+    "precision": 0.7711267605633803,
+    "recall": 0.8021978021978022,
+    "f1-score": 0.7863554757630161,
+    "support": 273.0
+  },
+  "Unbarred Loose Spiral": {
+    "precision": 0.7783505154639175,
+    "recall": 0.7763496143958869,
+    "f1-score": 0.7773487773487774,
+    "support": 389.0
+  },
+  "Edge-on without Bulge": {
+    "precision": 0.8619246861924686,
+    "recall": 0.9716981132075472,
+    "f1-score": 0.9135254988913526,
+    "support": 212.0
+  },
+  "Edge-on with Bulge": {
+    "precision": 0.9589552238805971,
+    "recall": 0.921146953405018,
+    "f1-score": 0.9396709323583181,
+    "support": 279.0
+  },
+  "accuracy": 0.8590960881124193,
+  "macro avg": {
+    "precision": 0.8392269249408522,
+    "recall": 0.8502100025086445,
+    "f1-score": 0.8424938818805756,
+    "support": 2633.0
+  },
+  "weighted avg": {
+    "precision": 0.8585063539560437,
+    "recall": 0.8590960881124193,
+    "f1-score": 0.8573571805537287,
+    "support": 2633.0
+  }
+}
