@@ -1,0 +1,4 @@
+model,test_accuracy,test_macro_f1,train_seconds,test_predict_seconds
+Random Forest,0.5812,0.5271,15.9,0.072
+CNN,0.795,0.7787,354.4,0.486
+ConvNeXt-Tiny,0.8728,0.8575,2543.6,6.381

@@ -1,0 +1,31 @@
+class,model,f1,recall
+Disturbed,Random Forest,0.277,0.198
+Merging,Random Forest,0.623,0.561
+Round Smooth,Random Forest,0.741,0.818
+In-between Round Smooth,Random Forest,0.631,0.696
+Cigar Shaped Smooth,Random Forest,0.194,0.12
+Barred Spiral,Random Forest,0.408,0.35
+Unbarred Tight Spiral,Random Forest,0.535,0.612
+Unbarred Loose Spiral,Random Forest,0.422,0.411
+Edge-on without Bulge,Random Forest,0.758,0.853
+Edge-on with Bulge,Random Forest,0.682,0.7
+Disturbed,CNN,0.424,0.444
+Merging,CNN,0.833,0.833
+Round Smooth,CNN,0.912,0.907
+In-between Round Smooth,CNN,0.889,0.888
+Cigar Shaped Smooth,CNN,0.764,0.94
+Barred Spiral,CNN,0.797,0.81
+Unbarred Tight Spiral,CNN,0.75,0.817
+Unbarred Loose Spiral,CNN,0.604,0.522
+Edge-on without Bulge,CNN,0.888,0.886
+Edge-on with Bulge,CNN,0.925,0.95
+Disturbed,ConvNeXt-Tiny,0.588,0.58
+Merging,ConvNeXt-Tiny,0.911,0.917
+Round Smooth,ConvNeXt-Tiny,0.951,0.939
+In-between Round Smooth,ConvNeXt-Tiny,0.944,0.95
+Cigar Shaped Smooth,ConvNeXt-Tiny,0.822,0.88
+Barred Spiral,ConvNeXt-Tiny,0.874,0.886
+Unbarred Tight Spiral,ConvNeXt-Tiny,0.836,0.868
+Unbarred Loose Spiral,ConvNeXt-Tiny,0.776,0.746
+Edge-on without Bulge,ConvNeXt-Tiny,0.926,0.919
+Edge-on with Bulge,ConvNeXt-Tiny,0.945,0.954
